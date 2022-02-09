@@ -3,7 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.contrib import messages
-from bookmarks.commom.decorators import ajax_required
+from commom.decorators import ajax_required
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.http import HttpResponse
 from .models import Image
 from .forms import ImageCreateForm
 
@@ -66,3 +68,32 @@ def image_like(request):
         except:
             pass
     return JsonResponse({'status':'error'})
+
+
+@login_required
+def image_list(request):
+    """
+    Recupera todas as imagens do db e constroi um objeto paginator, recuperando
+    8 imagens por pagina, Se a pagina entiver fora do intervalo levanta EmptyPage
+    por fim renderiza o resultado em dois templates. 
+    """
+    images = Image.objects.all()
+    paginator = Paginator(images, 8)
+    page = request.GET.get('page')
+    try:
+        images = paginator.page(page)
+    except PageNotAnInteger:
+        # Se a pagina não for um numero inteiro, mostra a primeira pagina
+        images = paginator.page(1)
+    except EmptyPage:
+        if request.is_ajax():
+            # Se a solicitação for AJAX e a página estiver fora do intervalo
+            # Retorna uma página vazia
+            return HttpResponse('')
+        # Se a página não estiver no intervalo mostra a ultima pagina
+        images = paginator.page(paginator.num_pages)
+    if request.is_ajax():
+        return render(request, 'images/image/list_ajax.html',
+                    {'section': 'images', 'images': images})
+    return render(request, 'images/image/list.html',
+                    {'section': 'images', 'images':images})
